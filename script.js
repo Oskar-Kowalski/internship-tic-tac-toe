@@ -38,7 +38,17 @@ const currentPlayerDisplay = document.getElementById("currentPlayer"); // The cu
  */
 const WINNING_COMBINATIONS = [
   // Example: [0, 1, 2] for the top row is a winning combination. Find the other 7!
+  [0, 1, 2], 
+  [3, 4, 5], 
+  [6, 7, 8],
+  [0, 3, 6], 
+  [1, 4, 7], 
+  [2, 5, 8], 
+  [0, 4, 8], 
+  [2, 4, 6]  
 ];
+
+
 
 // --- 2. HELPER FUNCTIONS ---
 
@@ -51,7 +61,12 @@ const getCellValue = (index) => {
   // Implementation:
   // 1. Access the correct cell element using the 'cells' NodeList and the 'index'.
   // 2. Use the .getAttribute() method to retrieve the value of 'data-value'.
+  const cell = cells[index]; 
+  return cell.getAttribute("data-value") || null; 
+
 };
+
+
 
 /**
  * Checks if a winning combination exists.
@@ -64,6 +79,16 @@ const checkWinner = () => {
   // 3. Check if the value at 'a' is not null AND if it is equal to the values at 'b' and 'c'.
   // 4. If a match is found, immediately return the winning player's value (e.g., 'X' or 'O').
   // 5. If the loop completes without a match, return null.
+  for (const [a, b, c] of WINNING_COMBINATIONS) {
+  const vala = getCellValue(a);
+  const valb = getCellValue(b);
+  const valc = getCellValue(c);
+
+  if (vala && vala === valb && vala === valc) {
+    return vala; 
+  }
+}
+return null;
 };
 
 /**
@@ -76,6 +101,8 @@ const isBoardFull = () => {
   // 2. Use the .every() array method.
   // 3. Inside the .every() callback, check if the cell element has the 'data-value' attribute (meaning it's filled).
   // 4. Return the result of the .every() check.
+  return Array.from(cells).every(cell => cell.getAttribute("data-value"));
+
 };
 
 /**
@@ -88,6 +115,9 @@ const updateCellDisplay = (index, value) => {
   // Implementation:
   // 1. Access the correct cell element using 'cells' and 'index'.
   // 2. Use the .setAttribute() method to set 'data-value' to the 'value' parameter.
+  const cell = cells[index];
+    cell.setAttribute("data-value", value);
+
 };
 
 /**
@@ -104,6 +134,7 @@ const updateCellDisplay = (index, value) => {
 const makeMove = (index, player) => {
   // Implementation:
   // 1. This function is a simple wrapper. Call updateCellDisplay(index, player).
+  updateCellDisplay(index, player);
 };
 
 // --- 3. CORE GAME LOGIC ---
@@ -118,6 +149,13 @@ const computerMove = () => {
   // 2. If the empty cells array is length 0, return immediately.
   // 3. Select a random index from the empty cells array (Hint: Math.random() and Math.floor()).
   // 4. Call makeMove() to place the computer's mark ('O') on that random index.
+  const emptyIndices = Array.from(cells)
+  .map((cell, ind) => (cell.getAttribute("data-value") ? null : ind))
+  .filter((val) => val !== null);
+  if(emptyIndices.length === 0) return;
+
+  const randIdx = emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
+  makeMove(randIdx, "O");
 };
 
 /**
@@ -132,6 +170,19 @@ const updateGameStatus = () => {
   // 3. ELSE (Game is ongoing):
   //    - Set gameStatus.textContent to a general message (e.g., "Your turn!").
   //    - Ensure 'winner' and 'draw' classes are removed from gameStatus.
+  if (gameState.winner) {
+    gameStatus.textContent = `Player ${gameState.winner} wins!`;
+    gameStatus.classList.add("winner");
+    gameStatus.classList.remove("draw");
+  } else if (isBoardFull()) {
+    gameStatus.textContent = "It's a draw!";
+    gameStatus.classList.add("draw");
+    gameStatus.classList.remove("winner");
+  } else {
+    gameStatus.textContent = "Your turn!";
+    gameStatus.classList.remove("winner", "draw");
+  }
+
 };
 
 /**
@@ -151,6 +202,23 @@ const checkGameEnd = () => {
   //    - Call updateGameStatus().
   //    - Return true.
   // 4. Otherwise, return false.
+  const winner = checkWinner();
+  if(winner) {
+    gameState.isGameOver = true;
+    gameState.winner = winner;
+    cells.forEach(cell => cell.classList.add("game-over"));
+    updateGameStatus();
+    return true;
+  }
+
+  if( isBoardFull()){
+    gameState.isGameOver = true;
+    gameState.winner = null;
+    updateGameStatus();
+    return true;
+  }
+
+  return false;
 };
 
 /**
@@ -168,6 +236,21 @@ const handleCellClick = (index) => {
   //    - Inside the delay, call computerMove().
   //    - After computerMove, call checkGameEnd().
   //    - If the game is NOT over, reset gameStatus.textContent and set currentPlayerDisplay.textContent back to 'X'.
+  if (gameState.isGameOver || getCellValue(index)) return;
+
+  makeMove(index, "X");
+
+  if (checkGameEnd()) return;
+
+  gameStatus.textContent = "thinking";
+  currentPlayerDisplay.textContent = "O";
+
+  setTimeout(() => {
+    computerMove();
+    if (checkGameEnd()) return;
+    gameStatus.textContent = "Your turn!";
+    currentPlayerDisplay.textContent = "X";
+  }, 1000);
 };
 
 /**
@@ -179,18 +262,26 @@ const resetGame = () => {
   // 2. Clear all cells: Loop through 'cells' NodeList. For each cell, use .removeAttribute('data-value') and .classList.remove('game-over').
   // 3. Reset status message: Set gameStatus.textContent to "Click any cell to start!" and remove the 'winner' and 'draw' classes.
   // 4. Ensure currentPlayerDisplay.textContent is set to 'X'.
+  gameState.isGameOver = false;
+  gameState.winner = null;
+  cells.forEach(cell => {
+    cell.removeAttribute("data-value");
+    cell.classList.remove("game-over");
+  });
+  gameStatus.textContent = "Click any cell to start!";
+  gameStatus.classList.remove("winner", "draw");
+  currentPlayerDisplay.textContent = "X";
 };
 
 // --- 4. EVENT LISTENERS ---
 
 // 1. Attach the handleCellClick function to every cell element.
 cells.forEach((cell, index) => {
+
   // Implementation:
   // Use .addEventListener('click', ...) and ensure you pass the correct 'index' to handleCellClick.
+  cell.addEventListener("click", () => handleCellClick(index));
 });
 
 // 2. Attach the resetGame function to the reset button.
-resetButton.addEventListener("click", () => {
-  // Implementation:
-  // Call the resetGame() function.
-});
+resetButton.addEventListener("click", resetGame);
